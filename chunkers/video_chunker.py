@@ -6,12 +6,12 @@ import ffmpeg
 from utils import get_chunks_folder_name
 
 
-def get_video_duration(file_path):
+def get_video_duration(file_path: str) -> float:
     probe = ffmpeg.probe(file_path)
     video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
     return float(video_info['duration'])
 
-def split_chunk(args):
+def split_chunk(args: tuple[str, str, float, float]) -> str:
     input_file, output_file, start_time, duration = args
     (
         ffmpeg
@@ -22,7 +22,7 @@ def split_chunk(args):
     )
     return output_file
 
-def split_video(file_path, num_chunks=2):
+def split_video(file_path: str, num_chunks: int = 2) -> list[str]:
     file_path = Path(file_path)
     file_name, file_extension = get_chunks_folder_name(file_path)
 
