@@ -1,39 +1,60 @@
-import itertools
-import os
+import multiprocessing
+from pathlib import Path
 
-from PIL import Image
+import ffmpeg
 
 from utils import get_chunks_folder_name
 
 
-def split_image(file_path, num_chunks):
-    image = Image.open(file_path)
-    image_width, image_height = image.size
+def get_image_dimensions(file_path: str) -> tuple[int, int]:
+    probe = ffmpeg.probe(file_path)
+    video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
+    width = int(video_info['width'])
+    height = int(video_info['height'])
+    return width, height
 
+def split_chunk(args: tuple[str, str, int, int, int, int]) -> str:
+    input_file, output_file, left, top, width, height = args
+    (
+        ffmpeg
+        .input(input_file)
+        .crop(left, top, width, height)
+        .output(output_file)
+        .overwrite_output()
+        .run(quiet=True)
+    )
+    return output_file
+
+
+def split_image(file_path: str, num_chunks: int = 2) -> list[str]:
+    file_path = Path(file_path)
+    file_name, file_extension = get_chunks_folder_name(file_path)
+
+    width, height = get_image_dimensions(str(file_path))
+
+    # Calculate grid dimensions based on num_chunks
     num_chunks_horizontal = int(num_chunks ** 0.5)
     num_chunks_vertical = num_chunks // num_chunks_horizontal
 
-    chunk_width = (image_width + num_chunks_horizontal - 1) // num_chunks_horizontal
-    chunk_height = (image_height + num_chunks_vertical - 1) // num_chunks_vertical
+    # Calculate chunk dimensions
+    chunk_width = (width + num_chunks_horizontal - 1) // num_chunks_horizontal
+    chunk_height = (height + num_chunks_vertical - 1) // num_chunks_vertical
 
-    file_name = get_chunks_folder_name(file_path)[0]
-    chunks_folder_name = f'{file_name}_chunks'
-    os.makedirs(chunks_folder_name, exist_ok=True)
+    chunks_folder = Path(f"{file_name}_chunks")
+    chunks_folder.mkdir(exist_ok=True)
 
-    chunk_files = []
+    split_args = []
+    for y in range(num_chunks_vertical):
+        for x in range(num_chunks_horizontal):
+            left = x * chunk_width
+            top = y * chunk_height
+            w = min(chunk_width, width - left)
+            h = min(chunk_height, height - top)
 
-    for count, (y_pixels, x_pixels) in enumerate(itertools.product(range(num_chunks_vertical), range(num_chunks_horizontal))):
-        left = x_pixels * chunk_width
-        upper = y_pixels * chunk_height
-        right = min((x_pixels + 1) * chunk_width, image_width)
-        lower = min((y_pixels + 1) * chunk_height, image_height)
+            output_file = chunks_folder / f'{file_name}.chunk{y*num_chunks_horizontal+x+1}{file_extension}'
+            split_args.append((str(file_path), str(output_file), left, top, w, h))
 
-        chunk = image.crop((left, upper, right, lower))
-        chunk_file_path = os.path.join(
-            chunks_folder_name,
-            f'{file_name}.chunk{count + 1}{get_chunks_folder_name(file_path)[1]}'
-        )
+    with multiprocessing.Pool() as pool:
+        chunk_files = pool.map(split_chunk, split_args)
 
-        chunk.save(chunk_file_path)
-        chunk_files.append(chunk_file_path)
     return chunk_files
