@@ -2,7 +2,7 @@
 
 ## Project Description
 
-ChunkIt is a Telegram bot that enables users to split various file types (images, videos, archives, text files, and PDFs) into smaller chunks. This tool saves time and effort for users who need to manage and share large files by breaking them down into more manageable pieces.
+ChunkIt is a [Telegram bot](https://t.me/ChunkItBot) that enables users to split various file types (images, videos, archives, text files, and PDFs) into smaller chunks. This tool saves time and effort for users who need to manage and share large files by breaking them down into more manageable pieces.
 
 
 ## Motivation
